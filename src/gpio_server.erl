@@ -81,7 +81,7 @@ stop() ->
 init(Options) ->
     ?dbg("init: options ~p", [Options]),
     process_flag(trap_exit, true),
-    case erl_ddll:load(code:priv_dir(gpio), ?GPIO_DRV) of
+    case load_driver(code:priv_dir(gpio), ?GPIO_DRV) of
 	LoadRes when LoadRes =:= ok; 
 		     LoadRes =:= { error, already_loaded } ->
 	    Dbg = case proplists:get_value(debug, Options, false) of
@@ -206,3 +206,20 @@ terminate(_Reason, _State) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
+
+load_driver(Path, Name) ->
+    Ext = filename:extension(Name),
+    Base = filename:basename(Name,Ext),
+    NameExt = case os:type() of
+		  {unix,_} ->  Base++".so";
+		  {win32,_} -> Base++".dll"
+	      end,
+    SysPath = filename:join(Path,erlang:system_info(system_architecture)),
+    case filelib:is_regular(filename:join(SysPath,NameExt)) of
+	true -> erl_ddll:load(SysPath, Name);
+	false ->
+	    case filelib:is_regular(filename:join(Path,NameExt)) of
+		true -> erl_ddll:load(Path, Name);
+		false -> {error, enoent}
+	    end
+    end.

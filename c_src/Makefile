@@ -4,8 +4,10 @@ all : $(PRIVDIR)/gpio_drv.so
 
 override CFLAGS += -fpic -shared
 
-$(PRIVDIR)/gpio_drv.so : gpio_drv.o
-	$(CC) -shared -fpic $(LDFLAGS) -o $@ $^
+OBJS = gpio_drv.o gpio_bcm2835.o gpio_omap34xx.o
+
+$(PRIVDIR)/gpio_drv.so : $(OBJS)
+	$(CC) -shared -fpic $(LDFLAGS) -o $@ $(OBJS)
 
 lean:
-	$(RM) -f $(PRIVDIR)/gpio_drv.so gpio_drv.o
+	$(RM) -f $(PRIVDIR)/gpio_drv.so $(OBJS)

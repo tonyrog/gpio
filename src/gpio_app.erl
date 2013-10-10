@@ -50,7 +50,6 @@
 		   {error, Reason::term()}.
 
 start(_StartType, _StartArgs) ->
-    ?ei("~p: start: arguments ignored.\n", [?MODULE]),
     Opts = case application:get_env(gpio, options) of
 	       undefined -> [];
 	       {ok, O1} -> O1

@@ -27,8 +27,12 @@
 -define(GPIO_DRV, gpio_drv).
 -define(GPIO_PORT, gpio_port).
 
--define(dbg(String, List), 
-	io:format("~p: " ++ String, [?MODULE | List])).
+-ifdef(DEBUG).
+-define(dbg(Fmt, Args),
+	io:format("~p " ++ Fmt ++ "\n", [?MODULE | Args])).
+-else.
+-define(dbg(Fmt, Args), ok).
+-endif.
 
 %% Convenience defines 
 -ifndef(ee).

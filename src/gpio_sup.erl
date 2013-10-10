@@ -50,8 +50,6 @@
 			{error, Error::term()}.
 
 start_link(Args) ->
-    ?ei("~p: start_link: args = ~p", [?MODULE, Args]),
-
     F =	case proplists:get_value(linked,Args,true) of
 	    true -> start_link;
 	    false -> start
@@ -80,7 +78,6 @@ start_link(Args) ->
 -spec stop(StartArgs::list(term())) -> ok | {error, Error::term()}.
 
 stop(_StartArgs) ->
-    ?ei("~p: stop.", [?MODULE]),
     exit(normal).
 
 %% ===================================================================
@@ -88,13 +85,9 @@ stop(_StartArgs) ->
 %% ===================================================================
 %% @private
 init(Args) ->
-    ?ei("~p: init: args = ~p,\n pid = ~p", [?MODULE, Args, self()]),
     GpioServer = {?GPIO_SRV, 
 		  {?GPIO_SRV, start_link, [Args]}, 
 		  permanent, 5000, worker, [?GPIO_SRV]},
     Processes = [GpioServer],
     ?dbg("~p: About to start ~p\n", [?MODULE, Processes]),
     {ok, { {one_for_one, 5, 10}, Processes} }.
-
-
-
