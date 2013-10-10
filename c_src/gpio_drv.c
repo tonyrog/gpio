@@ -412,30 +412,30 @@ static gpio_pin_t* init_pin(gpio_ctx_t* ctx, int pin_reg, int pin)
 {
     gpio_pin_t* gp = NULL;
     int fd = -1;
+    int is__exported = 0;
     gpio_errno = EINVAL;
 
     DEBUGF("init_pin: pin %d:%d", pin_reg, pin);
 
     //If pin not already exported, export it
-    switch(is_exported(pin)) {
-    case 0:
-	if (export(pin) != GPIO_OK)
-	    return NULL;
-	break;
-    case 1:
-	break;
-    default:
+    if ((is__exported = is_exported(pin)) < 0)
 	return NULL;
+    if (!is__exported) {
+	if (export(pin) == GPIO_OK)
+	    is__exported = 1;
+	else {
+	    if (ctx->chipset == gpio_chipset_none)
+		return NULL;
+	}
     }
-
-    // Prepare value file
-    if((fd = open_value_file(pin)) < 0)
-	return NULL;
-
-    if ((gp=create_pin(ctx, pin_reg, pin)) == NULL)
-	close(fd);
-    gp->fd = (ErlDrvEvent)((long)fd);
-
+    if (is__exported) {
+	// Prepare value file
+	if((fd = open_value_file(pin)) < 0)
+	    return NULL;
+	if ((gp=create_pin(ctx, pin_reg, pin)) == NULL)
+	    close(fd);
+	gp->fd = (ErlDrvEvent)((long)fd);
+    }
     // Set default interrupt target to process that created the pin struct
     gp->target = driver_caller(ctx->port);
 
@@ -533,6 +533,9 @@ static int gpio_set_direction(gpio_ctx_t* ctx,
 					      gp->pin_reg, mask, value);
 	    break;
 	case gpio_direction_undef:
+	    result = -1;
+	    break;
+	default:
 	    result = -1;
 	    break;
 	}
