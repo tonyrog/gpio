@@ -7,7 +7,7 @@ IO-pins are accessed either in a generic, Linux-based, way using control files o
 Direct memory acces is currently implemented for the following processors:
 <ul>
 <li>bcm 2835 (Raspberry Pi)</li>
-<li>omap 34xx (AR Drone 2)<li>
+<li>omap 34xx (AR Drone 2)</li>
 </ul>
 
 ### Dependencies
