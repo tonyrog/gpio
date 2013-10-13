@@ -13,7 +13,8 @@
 
 typedef enum  {
     gpio_chipset_none = 0,
-    bcm2835 = 1,
+    bcm2835  = 1,
+    omap34xx = 2
 } gpio_chipset_t;
 
 typedef enum  {
@@ -29,7 +30,6 @@ typedef enum {
     gpio_direction_high = 4  // out but start high
 } gpio_direction_t;
 
-
 typedef enum  {
     gpio_state_undef = -1,
     gpio_state_low = 0,
@@ -43,19 +43,31 @@ typedef enum {
     gpio_interrupt_both    = 3
 } gpio_interrupt_t;
 
+typedef void* (*init_fn_t)(void);
+typedef void  (*final_fn_t)(void*);
+
+typedef int (*set_output_fn_t)(void* handle, int reg, uint32_t mask,
+			       uint32_t value);
+typedef int (*set_input_fn_t)(void* handle, int reg, uint32_t mask);
+
+typedef uint32_t (*get_direction_fn_t)(void* handle, int reg, uint32_t mask);
+typedef int (*set_dataout_fn_t)(void* handle, int reg, uint32_t mask);
+typedef int (*clr_dataout_fn_t)(void* handle, int reg, uint32_t mask);
+typedef uint32_t (*get_datain_fn_t)(void* handle, int reg, uint32_t mask);
+
 
 typedef struct {
-    char*   name;   // name of chipset
-    off_t   base;   // register base address
-    size_t  len;    // register area length in bytes
-    
-    int (*set_direction)(volatile uint32_t* gpio_reg, int reg, int pin,
-			 gpio_direction_t direction);
-    int (*get_direction)(volatile uint32_t* gpio_reg, int reg, int pin,
-			 gpio_direction_t* direction);
-    int (*set_mask)(volatile uint32_t* gpio_reg, int reg, uint32_t mask);
-    int (*clr_mask)(volatile uint32_t* gpio_reg, int reg, uint32_t mask);
-    uint32_t (*get_mask)(volatile uint32_t* gpio_reg, int reg);
+    char*   name;      // name of chipset
+    int     max_regs;  // max pin regs
+
+    init_fn_t init;
+    final_fn_t final;
+    set_output_fn_t set_output;
+    set_input_fn_t set_input;
+    get_direction_fn_t get_direction;
+    set_dataout_fn_t set_dataout;
+    clr_dataout_fn_t clr_dataout;
+    get_datain_fn_t get_datain;
 } gpio_methods_t;
 
 //--------------------------------------------------------------------
@@ -93,5 +105,8 @@ typedef struct {
 
 extern void gpio_emit_log(int level, char* file, int line, ...);
 extern int gpio_debug_level;
+
+extern void* map_registers(off_t base, size_t len);
+extern int unmap_registers(void* addr, size_t len);
 
 #endif

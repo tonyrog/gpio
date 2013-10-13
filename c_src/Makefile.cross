@@ -15,7 +15,8 @@ DTHREAD=../../dthread
 
 OBJS = \
      $(OBJDIR)/gpio_drv.o \
-     $(OBJDIR)/gpio_bcm2835.o
+     $(OBJDIR)/gpio_bcm2835.o \
+     $(OBJDIR)/gpio_omap34xx.o
 
 LDFLAGS = -shared -fpic
 

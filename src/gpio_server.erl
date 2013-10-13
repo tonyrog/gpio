@@ -97,6 +97,7 @@ init(Options) ->
 	    CS = case proplists:get_value(chipset, Options, false) of
 		     false -> "";
 		     bcm2835 -> " b";
+		     omap34xx -> " o";
 		     Other ->
 			 ?ei("Unknown chip set %p, ignored",[Other]),
 			 ""
