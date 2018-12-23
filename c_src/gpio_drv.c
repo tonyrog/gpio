@@ -25,14 +25,11 @@
 #include <string.h>
 #include <sys/mman.h>
 
-#if USE_EPOLL 
 #define MAX_EPOLL_EVENTS 64 
 // if driver_event is not working, maybe kernel events was enabled?
 #include <sys/epoll.h>
-#endif
 
 #include "erl_driver.h"
-
 
 #define ATOM(NAME) am_ ## NAME
 #define INIT_ATOM(NAME) am_ ## NAME = driver_mk_atom(#NAME)
@@ -970,9 +967,6 @@ static int gpio_set_interrupt(gpio_pin_t* gp, gpio_interrupt_t interrupt)
 //--------------------------------------------------------------------
 static int add_interrupt(gpio_ctx_t* ctx, gpio_pin_t* gp)
 {
-    struct erl_drv_event_data evd;
-
-#ifdef USE_EPOLL
     if (INT_EVENT(ctx->epollfd) >= 0) {
 	struct epoll_event ev;
 	
@@ -988,15 +982,7 @@ static int add_interrupt(gpio_ctx_t* ctx, gpio_pin_t* gp)
 	}
 	return GPIO_OK;
     }
-#endif
-    // fallback - that may work
-    evd.events = POLLPRI | POLLERR;
-    evd.revents = 0;
-    if (driver_event(ctx->port, gp->fd, &evd) < 0) {
-	gpio_errno = errno;
-	return GPIO_NOK;
-    }
-    return GPIO_OK;
+    return GPIO_NOK;
 }
 
 //--------------------------------------------------------------------
@@ -1004,9 +990,6 @@ static int add_interrupt(gpio_ctx_t* ctx, gpio_pin_t* gp)
 //--------------------------------------------------------------------
 static int del_interrupt(gpio_ctx_t* ctx, gpio_pin_t* gp)
 {
-    struct erl_drv_event_data evd;
-
-#ifdef USE_EPOLL
     if (INT_EVENT(ctx->epollfd) >= 0) {
 	struct epoll_event ev;
 	
@@ -1022,15 +1005,7 @@ static int del_interrupt(gpio_ctx_t* ctx, gpio_pin_t* gp)
 	}
 	return GPIO_OK;
     }
-#endif
-    // fallback - that may work
-    evd.events  = 0;
-    evd.revents = 0;
-    if (driver_event(ctx->port, gp->fd, &evd) < 0) {
-	gpio_errno = errno;
-	return GPIO_NOK;
-    }
-    return GPIO_OK;
+    return GPIO_NOK;
 }
 
 //--------------------------------------------------------------------
@@ -1223,19 +1198,15 @@ static ErlDrvData gpio_drv_start(ErlDrvPort port, char* command)
     ctx->auto_create = auto_create;
     ctx->max_pin_regs = (meth != NULL) ? meth->max_regs : 0;
     ctx->gpio_priv = handle;
-    ctx->epollfd = (ErlDrvEvent) -1;
-#ifdef USE_EPOLL
-    {
-	ctx->epollfd = (ErlDrvEvent)((long)epoll_create(MAX_EPOLL_EVENTS));
-	if (INT_EVENT(ctx->epollfd) < 0) {
-	    DEBUGF("Failed epoll_create (%d) reason, %s", MAX_EPOLL_EVENTS,
-		   strerror(errno));
-	}
-	else {
-	    driver_select(ctx->port, ctx->epollfd, ERL_DRV_READ, 1);
-	}
+
+    ctx->epollfd = (ErlDrvEvent)((long)epoll_create(MAX_EPOLL_EVENTS));
+    if (INT_EVENT(ctx->epollfd) < 0) {
+	DEBUGF("Failed epoll_create (%d) reason, %s", MAX_EPOLL_EVENTS,
+	       strerror(errno));
     }
-#endif
+    else {
+	driver_select(ctx->port, ctx->epollfd, ERL_DRV_READ, 1);
+    }
 
 #ifdef PORT_CONTROL_BINARY
     set_port_control_flags(port, PORT_CONTROL_FLAG_BINARY);
@@ -1267,10 +1238,8 @@ static void gpio_drv_stop(ErlDrvData d)
 	driver_free(gp);
 	gp = gpn;
     }    // add structure cleanup here
-#ifdef USE_EPOLL
     if (INT_EVENT(ctx->epollfd) >= 0)
 	driver_select(ctx->port, ctx->epollfd, ERL_DRV_USE, 0);
-#endif
     if (ctx->meth != NULL)
 	(*ctx->meth->final)(ctx->gpio_priv);
     driver_free(ctx);
@@ -1617,35 +1586,8 @@ static void gpio_drv_outputv(ErlDrvData d, ErlIOVec *ev)
 
 //--------------------------------------------------------------------
 //--------------------------------------------------------------------
-static void gpio_drv_event(ErlDrvData d, ErlDrvEvent e,
-				  ErlDrvEventData ed)
-{
-    gpio_ctx_t* ctx = (gpio_ctx_t*) d;
-    gpio_pin_t* gp = ctx->first;
-
-    DEBUGF("gpio_drv: event called fd=%d", INT_EVENT(e));
-
-    while(gp && (gp->fd != e))
-	gp = gp->next;
-    if (!gp) {
-	DEBUGF("gpio_drv: event not found");
-	return;
-    }
-    if (ed->revents & POLLERR)
-	goto error;
-    if (ed->revents & POLLPRI)
-	send_interrupt(ctx, gp);
-    return;
-error:
-    DEBUGF("gpio_drv_event read error (revents=%x) for pin %d:%d", 
-	   ed->revents, gp->pin_reg, gp->pin);
-}
-
-//--------------------------------------------------------------------
-//--------------------------------------------------------------------
 static void gpio_drv_ready_input(ErlDrvData d, ErlDrvEvent e)
 {
-#ifdef USE_EPOLL    
     gpio_ctx_t* ctx = (gpio_ctx_t*) d;
     DEBUGF("gpio_drv: ready_input called");
     if (ctx->epollfd == e) {
@@ -1657,10 +1599,6 @@ static void gpio_drv_ready_input(ErlDrvData d, ErlDrvEvent e)
 		send_interrupt(ctx, (gpio_pin_t*) events[i].data.ptr);
 	}
     }
-#else
-    (void) d;
-    (void) e;
-#endif
 }
 
 //--------------------------------------------------------------------
@@ -1700,6 +1638,7 @@ DRIVER_INIT(gpio_drv)
 
     DEBUGF("gpio driver_init");
 
+    memset(ptr, 0, sizeof(ErlDrvEntry));
     ptr->driver_name = "gpio_drv";
     ptr->init  = gpio_drv_init;
     ptr->start = gpio_drv_start;
@@ -1711,15 +1650,10 @@ DRIVER_INIT(gpio_drv)
     ptr->control = gpio_drv_ctl;
     ptr->timeout = gpio_drv_timeout;
     ptr->outputv = gpio_drv_outputv;
-    ptr->ready_async = 0;
-    ptr->flush = 0;
-    ptr->call = 0;
-    ptr->event = gpio_drv_event;
     ptr->extended_marker = ERL_DRV_EXTENDED_MARKER;
     ptr->major_version = ERL_DRV_EXTENDED_MAJOR_VERSION;
     ptr->minor_version = ERL_DRV_EXTENDED_MINOR_VERSION;
     ptr->driver_flags = ERL_DRV_FLAG_USE_PORT_LOCKING;
-    ptr->process_exit = 0;
     ptr->stop_select = gpio_drv_stop_select;
     return ptr;
 }
