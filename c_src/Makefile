@@ -1,3 +1,10 @@
+#@BEGIN-C_SRC-DEFAULT-RULES@
+ERL=$(shell readlink -f `which erl`)
+ERL_TOP=$(ERL:%/bin/erl=%)
+OS=$(shell uname -s)
+CFLAGS=-MMD -MF .$<.d -I$(ERL_TOP)/usr/include
+#@END-C_SRC-DEFAULT-RULES@
+
 PRIVDIR := ../priv
 
 all : $(PRIVDIR)/gpio_drv.so
@@ -11,3 +18,8 @@ $(PRIVDIR)/gpio_drv.so : $(OBJS)
 
 lean:
 	$(RM) -f $(PRIVDIR)/gpio_drv.so $(OBJS)
+
+%.o:	%.c
+	$(CC) $(CFLAGS) -c -fPIC $<
+
+-include ".*.d"

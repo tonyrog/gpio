@@ -1,13 +1,9 @@
 {application, gpio,
  [
   {description, "GPIO Server."},
-  {vsn, "1"},
+  {vsn, git},
   {registered, []},
-  {modules, [ 
-              gpio_server,
-              gpio_app,
-              gpio_sup
-            ] },
+  {modules, [ "@@MODULES@@" ]},
   {applications, [
                   kernel,
                   stdlib
